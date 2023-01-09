@@ -2,6 +2,7 @@ package graphics
 
 import androidx.compose.runtime.*
 import kotlinx.coroutines.runBlocking
+import math.*
 import org.lwjgl.opengl.GL41C.*
 
 
@@ -9,22 +10,18 @@ interface VertexArrayState {
     val id: Int
 }
 
-interface BoundVertexArrayScope {
-    val vertexArrayState: VertexArrayState
-}
-
 
 context(OpenGLScope)
 @Composable
-fun rememberVertexArrayState(
-    elementArrayBuffer: BufferState? = null,
-    vertexBuffers: List<BufferState> = emptyList()
+fun VertexArray(
+    vararg buffers: Pair<Int, BufferState<*>>,
+    indexBuffer: BufferState<*>? = null
 ): VertexArrayState {
 
     val vertexArrayState = remember(Unit) {
         runBlocking(context) {
             object : VertexArrayState {
-                override val id = glGenVertexArrays().also(::println)
+                override val id = glGenVertexArrays()
             }
         }
     }
@@ -38,43 +35,38 @@ fun rememberVertexArrayState(
     }
 
 
-    // change the element array buffer of the vao when it changes
-    remember(elementArrayBuffer) {
+    // update vertex array state when buffers change
+    remember(buffers) {
         runBlocking(context) {
             glBindVertexArray(vertexArrayState.id)
-            if (elementArrayBuffer != null)
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, elementArrayBuffer.id)
-            glBindVertexArray(0)
-        }
-    }
 
+            for ((index, buffer) in buffers) {
+                glEnableVertexAttribArray(index)
 
-    // disable the vertex buffers that are no longer used
-    // change the vertex buffers of the vao when they change and enable them
-    DisposableEffect(vertexBuffers) {
-        runBlocking(context) {
-            glBindVertexArray(vertexArrayState.id)
-            for (i in vertexBuffers.indices) {
-                glBindBuffer(GL_ARRAY_BUFFER, vertexBuffers[i].id)
-                glEnableVertexAttribArray(i)
-                glVertexAttribPointer(i, 3, GL_FLOAT, false, 0, 0)
-                println("vertex buffer $i enabled with id ${vertexBuffers[i].id}")
-            }
-            glBindVertexArray(0)
-        }
-
-        onDispose {
-            runBlocking(context) {
-                glBindVertexArray(vertexArrayState.id)
-                for (i in vertexBuffers.indices) {
-                    glDisableVertexAttribArray(i)
-                    println("vertex buffer $i disabled")
+                glBindBuffer(GL_ARRAY_BUFFER, buffer.id)
+                when (buffer.type) {
+                    FloatArray::class -> glVertexAttribPointer(index, 1, GL_FLOAT, false, 0, 0)
+                    Float2Array::class -> glVertexAttribPointer(index, 2, GL_FLOAT, false, 0, 0)
+                    Float3Array::class -> glVertexAttribPointer(index, 3, GL_FLOAT, false, 0, 0)
+                    Float4Array::class -> glVertexAttribPointer(index, 4, GL_FLOAT, false, 0, 0)
+                    else -> throw Exception("Unsupported buffer type: ${buffer.type}")
                 }
-                glBindVertexArray(0)
+                glBindBuffer(GL_ARRAY_BUFFER, 0)
             }
+
+            glBindVertexArray(0)
         }
     }
 
+
+    // update vertex array state when index buffer changes
+    remember(indexBuffer) {
+        runBlocking(context) {
+            glBindVertexArray(vertexArrayState.id)
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer?.id ?: 0)
+            glBindVertexArray(0)
+        }
+    }
 
 
     return vertexArrayState
@@ -82,23 +74,22 @@ fun rememberVertexArrayState(
 }
 
 
+
 context(OpenGLScope)
 @Composable
-inline fun VertexArray(
-    vertexArrayState: VertexArrayState = rememberVertexArrayState(),
-    content: @Composable context(BoundVertexArrayScope) () -> Unit
+inline operator fun VertexArrayState.invoke(
+    block: @Composable context(VertexArrayState) () -> Unit
 ) {
-
-    // only recreate scope object when vertex array state changes
-    val boundVertexArrayScope = remember(vertexArrayState) {
-        object : BoundVertexArrayScope {
-            override val vertexArrayState = vertexArrayState
-        }
-    }
-
-    // bind vertex array
-    runBlocking(context) { glBindVertexArray(vertexArrayState.id) }
-    content(boundVertexArrayScope)
+    runBlocking(context) { glBindVertexArray(id) }
+    block(this)
     runBlocking(context) { glBindVertexArray(0) }
+}
 
+
+context(OpenGLScope, PipelineState, VertexArrayState)
+@Composable
+fun Draw(mode: Int, count: Int, type: Int = GL_UNSIGNED_INT, offset: Long = 0) {
+    runBlocking(context) {
+        glDrawElements(mode, count, type, offset)
+    }
 }

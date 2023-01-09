@@ -5,7 +5,7 @@ import graphics.*
 import kotlinx.coroutines.*
 import math.Color
 import org.lwjgl.glfw.GLFW.*
-import org.lwjgl.opengl.GL
+import org.lwjgl.opengl.*
 import org.lwjgl.opengl.GL41C.*
 import java.util.concurrent.Executors
 

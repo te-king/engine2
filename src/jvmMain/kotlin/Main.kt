@@ -1,33 +1,75 @@
 import androidx.compose.runtime.*
 import engine.*
 import graphics.*
-import kotlinx.coroutines.delay
-import math.Color
+import kotlinx.coroutines.*
+import math.*
 import org.lwjgl.opengl.GL41C.*
+import org.lwjgl.opengl.GLUtil
 import utilities.compose
 
-context(OpenGLScope)
-fun triangle() {
 
-}
+val vertexShader = """
+    #version 400 core
+    
+    layout (location = 0) in vec3 position;
+    
+    out gl_PerVertex {
+        vec4 gl_Position;     // makes gl_Position is part of interface
+        float gl_PointSize;   // makes gl_PointSize is part of interface
+    };                        // no more members of gl_PerVertex are used
+    
+    void main() {
+        gl_Position = vec4(position, 1.0);
+    }
+""".trimIndent()
+
+
+val fragmentShader = """
+    #version 400 core
+    
+    out vec4 color;
+    
+    void main() {
+        color = vec4(1.0, 1.0, 1.0, 1.0);
+    }
+""".trimIndent()
+
+
+val triangleVerticies = float3ArrayOf(
+    Float3(0f, 0f, 0f),
+    Float3(0.5f, 0f, 0f),
+    Float3(0f, 0.5f, 0f),
+)
+
+val triangleIndices = intArrayOf(
+    0, 1, 2
+)
 
 fun main() = compose {
 
     var clearColor by remember { mutableStateOf(Color.red) }
-    var vertexCount by remember { mutableStateOf(3) }
 
 
     Glfw {
 
         Window(clearColor, title = "Hello World") {
 
-            val vao = rememberVertexArrayState(
-                elementArrayBuffer = rememberBufferState(),
-                vertexBuffers = List(vertexCount) { rememberBufferState() }
+            val vao = VertexArray(
+                0 to Buffer(triangleVerticies),
+                indexBuffer = Buffer(triangleIndices)
             )
 
-            VertexArray(vao) {
 
+            val pipeline = Pipeline(
+                vertexShader = Shader(GL_VERTEX_SHADER, vertexShader),
+                fragmentShader = Shader(GL_FRAGMENT_SHADER, fragmentShader)
+            )
+
+
+            pipeline {
+                vao {
+                    Draw(GL_TRIANGLES, 3)
+                }
             }
 
         }
@@ -41,12 +83,6 @@ fun main() = compose {
             delay(1000)
             clearColor = Color.random()
         }
-    }
-
-    // change vertexCount after 5 seconds
-    LaunchedEffect(Unit) {
-        delay(5000)
-        vertexCount = 4
     }
 
 }
