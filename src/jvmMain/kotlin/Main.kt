@@ -4,7 +4,6 @@ import graphics.*
 import kotlinx.coroutines.*
 import math.*
 import org.lwjgl.opengl.GL41C.*
-import org.lwjgl.opengl.GLUtil
 import utilities.compose
 
 
@@ -60,13 +59,10 @@ fun main() = compose {
             )
 
 
-            val pipeline = Pipeline(
-                vertexShader = Shader(GL_VERTEX_SHADER, vertexShader),
-                fragmentShader = Shader(GL_FRAGMENT_SHADER, fragmentShader)
-            )
-
-
-            pipeline {
+            Pipeline(
+                vertexShader = compiledShaderOf(GL_VERTEX_SHADER, vertexShader),
+                fragmentShader = compiledShaderOf(GL_FRAGMENT_SHADER, fragmentShader)
+            ) {
                 vao {
                     Draw(GL_TRIANGLES, 3)
                 }

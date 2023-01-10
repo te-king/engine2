@@ -86,7 +86,7 @@ inline operator fun VertexArrayState.invoke(
 }
 
 
-context(OpenGLScope, PipelineState, VertexArrayState)
+context(OpenGLScope, Pipeline, VertexArrayState)
 @Composable
 fun Draw(mode: Int, count: Int, type: Int = GL_UNSIGNED_INT, offset: Long = 0) {
     runBlocking(context) {

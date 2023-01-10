@@ -6,73 +6,25 @@ import kotlinx.coroutines.runBlocking
 import org.lwjgl.opengl.GL41C.*
 
 
-interface ShaderState {
-    val shaderId: Int
-}
-
-
-context(OpenGLScope)
-@Composable
-fun Shader(
-    type: Int,
-    source: String,
-): ShaderState {
-
-    val shaderState = remember(source) {
-        runBlocking(context) {
-            val result = object : ShaderState {
-                override val shaderId = glCreateShaderProgramv(type, source)
-            }
-
-            glGetProgramInfoLog(result.shaderId).let(::println)
-
-            result
-        }
-    }
-
-    DisposableEffect(source) {
-        onDispose {
-            runBlocking(context) {
-                glDeleteProgram(shaderState.shaderId)
-            }
-        }
-    }
-
-
-    return shaderState
-
-}
-
-
-interface PipelineState {
-    val pipelineId: Int
-}
+@JvmInline
+value class Pipeline(val id: Int)
 
 
 context(OpenGLScope)
 @Composable
 fun Pipeline(
-    vertexShader: ShaderState,
-    fragmentShader: ShaderState
-): PipelineState {
+    vertexShader: Shader,
+    fragmentShader: Shader,
+    block: @Composable context(Pipeline) () -> Unit
+) {
 
-    val pipelineState = remember(Unit) {
-        runBlocking(context) {
-            val result = object : PipelineState {
-                override val pipelineId = glGenProgramPipelines()
-            }
-
-            glGetProgramPipelineInfoLog(result.pipelineId).let(::println)
-
-            result
-        }
+    val pipeline = remember(Unit) {
+        runBlocking(context) { glGenProgramPipelines().let(::Pipeline) }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            runBlocking(context) {
-                glDeleteProgramPipelines(pipelineState.pipelineId)
-            }
+            runBlocking(context) { glDeleteProgramPipelines(pipeline.id) }
         }
     }
 
@@ -80,23 +32,15 @@ fun Pipeline(
     // update pipeline state when shaders change
     remember(vertexShader, fragmentShader) {
         runBlocking(context) {
-            glUseProgramStages(pipelineState.pipelineId, GL_VERTEX_SHADER_BIT, vertexShader.shaderId)
-            glUseProgramStages(pipelineState.pipelineId, GL_FRAGMENT_SHADER_BIT, fragmentShader.shaderId)
+            glUseProgramStages(pipeline.id, GL_VERTEX_SHADER_BIT, vertexShader.id)
+            glUseProgramStages(pipeline.id, GL_FRAGMENT_SHADER_BIT, fragmentShader.id)
         }
     }
 
 
-    return pipelineState
-
-}
-
-
-context(OpenGLScope)
-@Composable
-inline operator fun PipelineState.invoke(
-    block: @Composable context(PipelineState) () -> Unit
-) {
-    runBlocking(context) { glBindProgramPipeline(pipelineId) }
-    block(this)
+    // bind pipeline and execute block
+    runBlocking(context) { glBindProgramPipeline(pipeline.id) }
+    block(pipeline)
     runBlocking(context) { glBindProgramPipeline(0) }
+
 }
